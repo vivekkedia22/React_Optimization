@@ -1,12 +1,11 @@
 import "./App.css";
-import Problem2 from "./Problem2";
 import Solution2 from "./Solution2";
 
 const App = () => (
-  <div className="App">
+  <div className="App" style={{ padding: "50px" }}>
     {/* <MemoDemoProblem /> */}
     {/* <MemoDemoSolution /> */}
-    <Problem2 />
+    {/* <Problem2 /> */}
     <Solution2 />
   </div>
 );
