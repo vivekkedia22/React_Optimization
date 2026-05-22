@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optimizing React</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+  <style>
+    :root {
+      --accent: #61dafb;      /* React blue */
+      --good: #46d39a;
+      --bad: #ff6b6b;
+    }
+    .reveal { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .reveal h1, .reveal h2 { text-transform: none; letter-spacing: -0.5px; }
+    .reveal .slide-title { color: var(--accent); margin-bottom: 24px; font-size: 1.5em; }
+
+    /* title slide */
+    .title-slide h1 { font-size: 2.6em; color: #fff; }
+    .title-slide h1::after {
+      content: ""; display: block; width: 90px; height: 4px;
+      background: var(--accent); margin: 18px auto 28px;
+    }
+    .title-slide .subtitle { font-size: 0.95em; color: #cfd6dd; }
+    .title-slide .subtitle code { color: var(--accent); }
+    .title-slide .byline { font-size: 0.6em; color: #8a929b; margin-top: 30px; }
+
+    /* slide header row */
+    .slide-head { display: flex; align-items: center; justify-content: space-between; }
+    .eyebrow { color: #8a929b; font-size: 0.5em; text-transform: uppercase; letter-spacing: 2px; }
+    .badge { font-size: 0.45em; font-weight: 700; padding: 6px 16px; border-radius: 999px; text-transform: uppercase; letter-spacing: 1px; }
+    .badge.bad { background: rgba(255,107,107,0.18); color: var(--bad); border: 1px solid var(--bad); }
+    .badge.good { background: rgba(70,211,154,0.18); color: var(--good); border: 1px solid var(--good); }
+
+    /* two column layout */
+    .two-col { display: flex; gap: 32px; align-items: flex-start; }
+    .col-code { flex: 1.25; min-width: 0; }
+    .col-notes { flex: 1; text-align: left; }
+    .reveal .two-col pre { width: 100%; box-shadow: 0 6px 24px rgba(0,0,0,0.4); margin: 0; }
+    .reveal .two-col code { font-size: 0.62em; line-height: 1.35; }
+    .col-notes ul { margin: 0 0 18px; }
+    .col-notes li { font-size: 0.62em; line-height: 1.4; margin-bottom: 12px; }
+    .reveal code { font-family: "SF Mono", "Fira Code", Menlo, monospace; }
+    .col-notes li code, .takeaways code, .concept code { color: var(--accent); }
+
+    /* result pill */
+    .result { font-size: 0.6em; font-weight: 600; padding: 12px 16px; border-radius: 10px; }
+    .result::before { font-weight: 700; margin-right: 8px; }
+    .result.bad { background: rgba(255,107,107,0.12); color: var(--bad); }
+    .result.bad::before { content: "\2718"; }
+    .result.good { background: rgba(70,211,154,0.12); color: var(--good); }
+    .result.good::before { content: "\2714"; }
+
+    /* concept + takeaways */
+    .concept { max-width: 820px; margin: 0 auto; text-align: left; }
+    .concept p { font-size: 0.78em; line-height: 1.5; }
+    .concept .warn { border-left: 4px solid var(--accent); padding-left: 18px; }
+    .takeaways { max-width: 880px; margin: 0 auto; text-align: left; }
+    .takeaways li { font-size: 0.72em; line-height: 1.45; margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+<section class="title-slide">
+  <h1>Optimizing React</h1>
+  <p class="subtitle">Stop unnecessary re-renders with <code>React.memo</code>,
+     <code>useCallback</code> &amp; <code>useMemo</code></p>
+  <p class="byline">A walk through two real before / after examples</p>
+</section>
+
+<section>
+  <h2 class="slide-title">The core idea</h2>
+  <div class="concept">
+    <p>When a component re-renders, <strong>all of its children re-render too</strong>
+       &mdash; even the expensive ones.</p>
+    <p><code>React.memo</code> lets a child skip re-rendering <em>when its props
+       have not changed</em>.</p>
+    <p class="warn">But props are compared by <strong>reference</strong>.
+       A fresh <code>{}</code> object or a new arrow function is
+       <em>never</em> equal to the previous one &mdash; so <code>memo</code>
+       alone is not enough.</p>
+  </div>
+</section>
+
+<section>
+  <div class="slide-head">
+    <span class="eyebrow">Example 1 &middot; rendering on state change</span>
+    <span class="badge bad">Problem</span>
+  </div>
+  <h2 class="slide-title">New props on every render</h2>
+  <div class="two-col">
+    <div class="col-code">
+      <pre><code class="language-jsx" data-trim data-line-numbers="5-7|16|20">
+const MemoDemoProblem = () =&gt; {
+  const [state, setState] = useState(true);
+
+  // new function reference on EVERY render
+  const aFunc = () =&gt; {
+    alert(&quot;Hello World&quot;);
+  };
+
+  return (
+    &lt;&gt;
+      &lt;button onClick={() =&gt; setState(p =&gt; !p)}&gt;
+        Toggle: {state ? &quot;True&quot; : &quot;False&quot;}
+      &lt;/button&gt;
+
+      {/* new object literal on EVERY render */}
+      &lt;HeavyComponent aFunc={aFunc} name={{ firstName: &quot;Vivek&quot; }} /&gt;
+    &lt;/&gt;
+  );
+};
+
+// child is NOT memoized
+export default HeavyComponent;
+</code></pre>
+    </div>
+    <div class="col-notes">
+      <ul>
+<li>Clicking the button re-renders the parent.</li>
+<li><code>aFunc</code> and <code>{ firstName }</code> are <strong>created fresh</strong> each render.</li>
+<li>Their references change, so the child re-renders too &mdash; even if wrapped in <code>React.memo</code>.</li>
+</ul>
+      <div class="result bad">Heavy child re-renders on every click</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="slide-head">
+    <span class="eyebrow">Example 1 &middot; rendering on state change</span>
+    <span class="badge good">Solution</span>
+  </div>
+  <h2 class="slide-title">Stabilise the props, then memoize</h2>
+  <div class="two-col">
+    <div class="col-code">
+      <pre><code class="language-jsx" data-trim data-line-numbers="5-7|10-13|24">
+const MemoDemoSolution = () =&gt; {
+  const [state, setState] = useState(true);
+
+  // stable function reference
+  const aFunc = useCallback(() =&gt; {
+    alert(&quot;Hello world&quot;);
+  }, []);
+
+  // stable object reference
+  const { name } = useMemo(
+    () =&gt; ({ name: { firstName: &quot;Vivek&quot; } }),
+    []
+  );
+
+  return (
+    &lt;&gt;
+      &lt;button onClick={() =&gt; setState(p =&gt; !p)}&gt;
+        Toggle: {state ? &quot;True&quot; : &quot;False&quot;}
+      &lt;/button&gt;
+      &lt;HeavyComponent aFunc={aFunc} name={name} /&gt;
+    &lt;/&gt;
+  );
+};
+
+// skip re-render when props are referentially equal
+export default React.memo(HeavyComponent);
+</code></pre>
+    </div>
+    <div class="col-notes">
+      <ul>
+<li><code>useCallback</code> keeps the function reference stable.</li>
+<li><code>useMemo</code> keeps the object reference stable.</li>
+<li><code>React.memo</code> can now compare props and bail out.</li>
+</ul>
+      <div class="result good">Child renders once; clicks no longer touch it</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="slide-head">
+    <span class="eyebrow">Example 2 &middot; a callback that needs live state</span>
+    <span class="badge bad">Problem</span>
+  </div>
+  <h2 class="slide-title">The callback depends on changing state</h2>
+  <div class="two-col">
+    <div class="col-code">
+      <pre><code class="language-jsx" data-trim data-line-numbers="6-8|14">
+const Problem2 = () =&gt; {
+  const [input, setInput] = useState(&quot;&quot;);
+
+  // recreated on EVERY keystroke, and it
+  // closes over `input`
+  const aFunc = () =&gt; {
+    alert(`Hello::${input}`);
+  };
+
+  return (
+    &lt;&gt;
+      &lt;input
+        value={input}
+        onInput={e =&gt; setInput(e.target.value)}
+      /&gt;
+      &lt;HeavyComponent aFunc={aFunc} /&gt;
+    &lt;/&gt;
+  );
+};
+</code></pre>
+    </div>
+    <div class="col-notes">
+      <ul>
+<li>Every keystroke updates <code>input</code> and re-renders the parent.</li>
+<li><code>aFunc</code> must read the latest <code>input</code>, so it is rebuilt each render.</li>
+<li><code>useCallback(fn, [input])</code> would still change every keystroke &mdash; <code>memo</code> stays useless.</li>
+</ul>
+      <div class="result bad">Heavy child re-renders on every keystroke</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="slide-head">
+    <span class="eyebrow">Example 2 &middot; a callback that needs live state</span>
+    <span class="badge good">Solution</span>
+  </div>
+  <h2 class="slide-title">The &ldquo;latest ref&rdquo; pattern</h2>
+  <div class="two-col">
+    <div class="col-code">
+      <pre><code class="language-jsx" data-trim data-line-numbers="3|7-9|12">
+const Solution2 = () =&gt; {
+  const [input, setInput] = useState(&quot;&quot;);
+  const ref = useRef();
+
+  // runs every render: ref always points
+  // at the LATEST closure over `input`
+  useEffect(() =&gt; {
+    ref.current = () =&gt; alert(`Hello ${input}`);
+  });
+
+  // stable reference, calls latest version
+  const aFunc = useCallback(() =&gt; ref.current(), []);
+
+  return (
+    &lt;&gt;
+      &lt;input
+        value={input}
+        onInput={e =&gt; setInput(e.target.value)}
+      /&gt;
+      &lt;HeavyComponent aFunc={aFunc} /&gt;
+    &lt;/&gt;
+  );
+};
+
+export default React.memo(HeavyComponent);  // child
+</code></pre>
+    </div>
+    <div class="col-notes">
+      <ul>
+<li>A <code>ref</code> always holds the newest closure over <code>input</code>.</li>
+<li><code>aFunc</code> is wrapped once with empty deps &mdash; its reference never changes.</li>
+<li>It forwards to <code>ref.current()</code>, so the button still sees the live value.</li>
+</ul>
+      <div class="result good">Stable prop + live data: child never re-renders</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="slide-title">Takeaways</h2>
+  <ul class="takeaways">
+    <li><code>React.memo</code> only helps when <strong>prop references are stable</strong>.</li>
+    <li>Wrap callbacks in <code>useCallback</code> and objects/arrays in <code>useMemo</code> before passing them to a memoized child.</li>
+    <li>When a stable callback still needs fresh state, store the closure in a <strong>ref</strong> and expose a one-time <code>useCallback</code> wrapper.</li>
+    <li>Measure first &mdash; reach for these only on components that are genuinely expensive to render.</li>
+  </ul>
+</section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: "c/t",
+      transition: "slide",
+      plugins: [RevealHighlight, RevealNotes],
+    });
+  </script>
+</body>
+</html>
