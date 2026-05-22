@@ -1,23 +1,13 @@
 import "./App.css";
-// eslint-disable-next-line import/extensions
-import logo from "./logo.svg";
+import Problem2 from "./Problem2";
+import Solution2 from "./Solution2";
 
 const App = () => (
   <div className="App">
-    <header className="App-header">
-      <img alt="logo" className="App-logo" src={logo} />
-      <p>
-        Edit <code>src/App.js</code> and save to reload.
-      </p>
-      <a
-        className="App-link"
-        href="https://reactjs.org"
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        Learn React
-      </a>
-    </header>
+    {/* <MemoDemoProblem /> */}
+    {/* <MemoDemoSolution /> */}
+    <Problem2 />
+    <Solution2 />
   </div>
 );
 
