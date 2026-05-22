@@ -9,13 +9,6 @@ const MemoDemoProblem = () => {
     alert("Hello World");
   };
 
-  /*
-  // const aFunc = useCallback(() => {
-  //   alert("Hello world");
-  // }, []);
-
-  */
-
   return (
     <div
       className="App"
